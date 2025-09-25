@@ -1,0 +1,30 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "1",
+    "name": "RoastBot",
+    "subtitle": "Built with Zara",
+    "description": "RoastBot is a Base Mini App built with Zara.",
+    "iconUrl": "https://0co.to/images/zara-2.png",
+    "homeUrl": "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app",
+    "splashImageUrl": "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app/splash.png",
+    "splashBackgroundColor": "#000000",
+    "heroImageUrl": "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app/image.png",
+    "tagline": "RoastBot",
+    "screenshotUrls": [
+      "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app/screenshot.png",
+      "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app/screenshot.png"
+    ],
+    "primaryCategory": "social",
+    "tags": [
+      "base",
+      "miniapp",
+      "onchainkit"
+    ],
+    "webhookUrl": "https://bfb5bbbc91ec46a384e14244a55f1235-ha9v.vercel.app/api/webhook"
+  }
+}
