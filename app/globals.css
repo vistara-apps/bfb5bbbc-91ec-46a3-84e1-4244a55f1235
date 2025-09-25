@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm Social Theme - Dark teal background with coral accents */
+  --color-bg: hsl(180 25% 15%);
+  --color-fg: hsl(180 15% 25%);
+  --color-accent: #ff6b6b;
+  --color-primary: hsl(180 40% 35%);
+  --color-surface: hsl(180 20% 20%);
+  --color-text-primary: hsl(0 0% 95%);
+  --color-text-secondary: hsl(0 0% 70%);
+}
+
+[data-theme="celo"] {
+  --color-bg: hsl(0 0% 0%);
+  --color-fg: hsl(0 0% 10%);
+  --color-accent: #fbcc5c;
+  --color-primary: hsl(45 90% 55%);
+  --color-surface: hsl(0 0% 5%);
+  --color-text-primary: hsl(0 0% 100%);
+  --color-text-secondary: hsl(0 0% 80%);
+}
+
+[data-theme="solana"] {
+  --color-bg: hsl(270 30% 15%);
+  --color-fg: hsl(270 25% 25%);
+  --color-accent: #9945ff;
+  --color-primary: hsl(270 100% 70%);
+  --color-surface: hsl(270 25% 20%);
+  --color-text-primary: hsl(0 0% 95%);
+  --color-text-secondary: hsl(0 0% 70%);
+}
+
+[data-theme="base"] {
+  --color-bg: hsl(220 40% 15%);
+  --color-fg: hsl(220 35% 25%);
+  --color-accent: #0052ff;
+  --color-primary: hsl(220 100% 50%);
+  --color-surface: hsl(220 35% 20%);
+  --color-text-primary: hsl(0 0% 95%);
+  --color-text-secondary: hsl(0 0% 70%);
+}
+
+[data-theme="coinbase"] {
+  --color-bg: hsl(220 50% 10%);
+  --color-fg: hsl(220 45% 20%);
+  --color-accent: #0052ff;
+  --color-primary: hsl(220 100% 50%);
+  --color-surface: hsl(220 45% 15%);
+  --color-text-primary: hsl(0 0% 95%);
+  --color-text-secondary: hsl(0 0% 70%);
+}
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+  
+  body {
+    @apply bg-bg text-text-primary;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-fg) 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-surface bg-opacity-80 backdrop-blur-sm border border-white border-opacity-10 rounded-lg shadow-card;
+  }
+  
+  .btn-primary {
+    @apply bg-accent text-white px-6 py-3 rounded-full font-medium hover:bg-opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-surface text-text-primary px-6 py-3 rounded-full font-medium hover:bg-opacity-80 transition-all duration-200 border border-white border-opacity-20;
+  }
+  
+  .input-field {
+    @apply bg-surface bg-opacity-60 border border-white border-opacity-20 rounded-lg px-4 py-3 text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200;
+  }
+  
+  .roast-text {
+    @apply text-lg leading-relaxed text-text-primary bg-surface bg-opacity-40 p-6 rounded-lg border border-white border-opacity-10;
+  }
+}
+
+.animate-typing {
+  overflow: hidden;
+  border-right: 2px solid var(--color-accent);
+  white-space: nowrap;
+  animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: var(--color-accent); }
+}
