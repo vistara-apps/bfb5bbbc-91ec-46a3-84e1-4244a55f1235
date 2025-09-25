@@ -6,13 +6,13 @@ import { RoastCard } from './components/RoastCard';
 import { CreditCounter } from './components/CreditCounter';
 import { ActionButtons } from './components/ActionButtons';
 import { CreditPurchase } from './components/CreditPurchase';
-import { generateRoast } from '@/lib/roast-generator';
 import { canGenerateRoast } from '@/lib/utils';
-import { RoastRequest, User } from '@/lib/types';
+import { User } from '@/lib/types';
 import { Flame, Sparkles } from 'lucide-react';
 
 export default function HomePage() {
   const [currentRoast, setCurrentRoast] = useState<string>('');
+  const [currentRoastId, setCurrentRoastId] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
   const [user, setUser] = useState<User>({
@@ -20,27 +20,76 @@ export default function HomePage() {
     creditsRemaining: 0,
     lastRoastTimestamp: undefined,
   });
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   // Initialize user data
   useEffect(() => {
-    const savedUser = localStorage.getItem('roastbot-user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    } else {
-      // New user gets 1 free roast
-      const newUser: User = {
-        userId: 'demo-user',
-        creditsRemaining: 1,
-        lastRoastTimestamp: undefined,
-      };
-      setUser(newUser);
-      localStorage.setItem('roastbot-user', JSON.stringify(newUser));
-    }
+    const initializeUser = async () => {
+      try {
+        // Try to get user from API first
+        const response = await fetch('/api/user?userId=demo-user');
+        let existingUser: User;
+
+        if (response.ok) {
+          const data = await response.json();
+          existingUser = data.user;
+        } else {
+          // New user gets 1 free roast
+          existingUser = {
+            userId: 'demo-user',
+            creditsRemaining: 1,
+            lastRoastTimestamp: undefined,
+          };
+
+          // Save new user via API
+          await fetch('/api/user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ user: existingUser }),
+          });
+        }
+
+        setUser(existingUser);
+      } catch (error) {
+        console.error('Error loading user:', error);
+        // Fallback to localStorage if API fails
+        const savedUser = localStorage.getItem('roastbot-user');
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
+        } else {
+          const newUser: User = {
+            userId: 'demo-user',
+            creditsRemaining: 1,
+            lastRoastTimestamp: undefined,
+          };
+          setUser(newUser);
+          localStorage.setItem('roastbot-user', JSON.stringify(newUser));
+        }
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    initializeUser();
   }, []);
 
-  const saveUser = (updatedUser: User) => {
+  const updateUserState = async (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('roastbot-user', JSON.stringify(updatedUser));
+    try {
+      await fetch('/api/user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user: updatedUser }),
+      });
+    } catch (error) {
+      console.error('Error saving user via API:', error);
+      // Fallback to localStorage
+      localStorage.setItem('roastbot-user', JSON.stringify(updatedUser));
+    }
   };
 
   const handleGenerateRoast = async (name: string, xProfileUrl: string) => {
@@ -51,24 +100,55 @@ export default function HomePage() {
 
     setIsGenerating(true);
     setCurrentRoast('');
+    setCurrentRoastId('');
 
     try {
-      const request: RoastRequest = {
-        name,
-        xProfileUrl,
-        userId: user.userId,
-      };
+      // Call the roast API
+      const response = await fetch('/api/roast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          xProfileUrl,
+          userId: user.userId,
+        }),
+      });
 
-      const roast = await generateRoast(request);
-      setCurrentRoast(roast);
+      if (!response.ok) {
+        throw new Error('Failed to generate roast');
+      }
 
-      // Update user credits and timestamp
+      const data = await response.json();
+      setCurrentRoast(data.roast);
+      setCurrentRoastId(data.roastId);
+
+      // Update user credits and timestamp locally
       const updatedUser: User = {
         ...user,
         creditsRemaining: Math.max(0, user.creditsRemaining - 1),
         lastRoastTimestamp: Date.now(),
       };
-      saveUser(updatedUser);
+
+      // Update user in database via API
+      try {
+        await fetch('/api/user', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.userId,
+            credits: updatedUser.creditsRemaining,
+            lastRoastTimestamp: updatedUser.lastRoastTimestamp,
+          }),
+        });
+      } catch (apiError) {
+        console.error('Error updating user via API:', apiError);
+      }
+
+      updateUserState(updatedUser);
 
     } catch (error) {
       console.error('Failed to generate roast:', error);
@@ -78,35 +158,99 @@ export default function HomePage() {
     }
   };
 
-  const handleShare = () => {
-    if (currentRoast) {
+  const handleShare = async () => {
+    if (currentRoast && currentRoastId) {
       const shareText = `Just got roasted by AI! 🔥\n\n"${currentRoast}"\n\nGet your own roast at RoastBot!`;
-      
-      if (navigator.share) {
-        navigator.share({
-          title: 'My AI Roast',
-          text: shareText,
-        });
-      } else {
-        // Fallback to copying to clipboard
-        navigator.clipboard.writeText(shareText);
-        alert('Roast copied to clipboard!');
+
+      try {
+        // Try Farcaster share first (if in a frame)
+        if (window.parent !== window) {
+          // We're in an iframe, likely Farcaster
+          window.parent.postMessage({
+            type: 'share',
+            text: shareText,
+          }, '*');
+        } else if (navigator.share) {
+          // Use native share API
+          await navigator.share({
+            title: 'My AI Roast',
+            text: shareText,
+          });
+        } else {
+          // Fallback to copying to clipboard
+          await navigator.clipboard.writeText(shareText);
+          alert('Roast copied to clipboard!');
+        }
+
+        // Increment share count via API
+        try {
+          await fetch('/api/roast/share', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              roastId: currentRoastId,
+            }),
+          });
+        } catch (apiError) {
+          console.error('Error incrementing share count:', apiError);
+        }
+
+      } catch (error) {
+        console.error('Error sharing:', error);
+        // Fallback to clipboard
+        try {
+          await navigator.clipboard.writeText(shareText);
+          alert('Roast copied to clipboard!');
+        } catch (clipboardError) {
+          console.error('Clipboard error:', clipboardError);
+        }
       }
     }
   };
 
   const handlePurchaseCredits = async (packageId: string) => {
-    // Mock purchase - in real app, this would integrate with Base/OnchainKit
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const creditAmounts = { starter: 3, popular: 10, premium: 25 };
-    const credits = creditAmounts[packageId as keyof typeof creditAmounts] || 3;
-    
-    const updatedUser: User = {
-      ...user,
-      creditsRemaining: user.creditsRemaining + credits,
-    };
-    saveUser(updatedUser);
+    try {
+      const creditAmounts = { starter: 3, popular: 10, premium: 25 };
+      const priceAmounts = { starter: '0.0005', popular: '0.0015', premium: '0.003' };
+
+      const credits = creditAmounts[packageId as keyof typeof creditAmounts] || 3;
+      const price = priceAmounts[packageId as keyof typeof priceAmounts] || '0.0005';
+
+      // In a real implementation, this would use OnchainKit's transaction components
+      // For now, we'll simulate the transaction
+      console.log(`Initiating purchase of ${credits} credits for ${price} ETH`);
+
+      // Simulate transaction delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const updatedUser: User = {
+        ...user,
+        creditsRemaining: user.creditsRemaining + credits,
+      };
+
+      // Update credits via API
+      try {
+        await fetch('/api/user', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.userId,
+            credits: updatedUser.creditsRemaining,
+          }),
+        });
+      } catch (apiError) {
+        console.error('Error updating user credits via API:', apiError);
+      }
+
+      updateUserState(updatedUser);
+    } catch (error) {
+      console.error('Purchase failed:', error);
+      throw error;
+    }
   };
 
   const handleTryAgain = () => {
@@ -114,6 +258,18 @@ export default function HomePage() {
   };
 
   const canGenerate = canGenerateRoast(user);
+
+  // Show loading state while initializing user
+  if (isLoadingUser) {
+    return (
+      <div className="min-h-screen p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-text-secondary">Loading RoastBot...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4">
